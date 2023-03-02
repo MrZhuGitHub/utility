@@ -112,6 +112,7 @@ void Scheduler::Eventloop()
 
 void Scheduler::SwapContext(Coroutine* current, Coroutine* next)
 {
+#ifdef defined(__x86_64__)
     __asm__ __volatile__ (
         "movq %rax,(%rsi)\n"
         "movq %rbx,8(%rsi)\n"
@@ -148,6 +149,7 @@ void Scheduler::SwapContext(Coroutine* current, Coroutine* next)
         "movq 120(%rdx),%r15\n"
         "movq 24(%rdx),%rdx\n"
     );
+#endif
 }
 
 Scheduler::~Scheduler()
