@@ -8,7 +8,7 @@
 void Func1(std::string str, int num)
 {
     std::cout << str << num << std::endl;
-    MyCoroutine::sleep(10000);
+    Common::sleep(10000);
 }
 
 void Func2()
@@ -18,9 +18,9 @@ void Func2()
 
 int main() 
 {
-    MyCoroutine::Coroutine continue1((void*)&Func1, std::string("abc"), 1);
-    continue1.Start(&scheduler);
-    MyCoroutine::Coroutine continue2((void*)&Func2);
-    continue2.Start(&scheduler);
+    Common::Coroutine continue1((void*)&Func1, std::string("abc"), 1);
+    continue1.Start();
+    Common::Coroutine continue2((void*)&Func2);
+    continue2.Start();
     scheduler.Eventloop();
 };

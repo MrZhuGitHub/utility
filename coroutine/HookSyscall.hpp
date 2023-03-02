@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 
-namespace MyCoroutine
+namespace Common
 {
 inline void coSleep(unsigned int milliseconds)
 {

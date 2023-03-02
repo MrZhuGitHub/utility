@@ -1,18 +1,18 @@
 #ifndef _RING_BUFFER_
 #define _RING_BUFFER_
 
-namespace MyRingBuffer {
+namespace Common {
 
 template<typename T>
-class RingBuffer
+class Channel
 {
 public:
-    RingBuffer()
+    Channel()
     {
 
     }
 
-    ~RingBuffer()
+    ~Channel()
     {
 
     }

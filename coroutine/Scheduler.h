@@ -8,8 +8,10 @@
 #define MAX_EVENTS 1024
 #define WAIT_DURATION 1
 
-namespace MyCoroutine
+namespace Common
 {
+extern Scheduler scheduler;
+
 class Coroutine;
 
 struct TimeEvent
@@ -53,6 +55,31 @@ public:
     friend class Coroutine;
 
 private:
+    template<typename T>
+    T* RemoveItem(T* head, T* item)
+    {
+        if (nullptr == head || nullptr == item)
+        {
+            return nullptr;
+        }
+        if (head == item) {
+            head = item->next;
+            return head;
+        }
+        T* preItem = head;
+        T* nextItem = head->next;
+        while (nextItem != item && nextItem != nullptr)
+        {
+            preItem = preItem->next;
+            nextItem = nextItem->next;
+        }
+        if (nextItem == item)
+        {
+            preItem = nextItem->next;
+        }
+        return head;
+    }
+
     void Resume(Coroutine* co);
 
     void RemoveCoroutine(Coroutine* co);
