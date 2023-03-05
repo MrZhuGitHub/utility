@@ -1,6 +1,8 @@
 #ifndef _COROUTINE_H_
 #define _COROUTINE_H_
 #include <functional>
+#include <cstdint>
+#include "Scheduler.h"
 
 #define STACK (1024*1024)
 #define MAX_STACK (10*STACK)
@@ -31,25 +33,37 @@ class Scheduler;
 
 class Coroutine {
 public:
-    template <typename ...Args>
-    Coroutine(void* Func, Args... args)
+    Coroutine()
+    :   stack_(nullptr),
+        next(nullptr),
+        stackSize_(STACK),
+        started_(false),
+        scheduler_(&scheduler)
+    {
+
+    }
+
+    template <typename F, typename... Args>
+    Coroutine(F Func, Args... args)
         : stack_(nullptr),
-          next_(nullptr),
-          before_(nullptr),
+          next(nullptr),
           stackSize_(STACK),
           started_(false),
           scheduler_(&scheduler)
-    {    
-        auto func = [&](void)->void
+    {   
+        std::function<void()> func = [&]()->void
         {
-            Func(args...);
+            std::function<decltype(Func(args...))()> f = std::bind(Func, args...);
+            f();
             auto mainCo = scheduler_->GetMainCoroutine();
             scheduler_->Resume(mainCo);
-        }
-        func_ = &func();
+        };
+        void (*fn)();
+        fn = func.target<void()>();
+        func_ = reinterpret_cast<void*>(fn);
     }
 
-    void Start(Scheduler* scheduler);
+    void Start();
 
     bool SetStackSize(uint32_t size);
 
@@ -63,10 +77,9 @@ private:
     void* func_;
     Scheduler* scheduler_;
     std::function<void(void)> function_;
-    Coroutine* next_;
+    Coroutine* next;
     uint32_t stackSize_;
     bool started_;
-
 };
 
 }

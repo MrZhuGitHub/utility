@@ -33,7 +33,7 @@ inline int coRead(int fd, char* str, unsigned int len)
     event.next = nullptr;
     event.co = scheduler.GetCurrentCoroutine();
     event.fd = fd;
-    event.event = (EPOLLIN|EPOLLERR);
+    event.event.events = (EPOLLIN|EPOLLERR);
     scheduler.AddIoEvent(&event);
     scheduler.Resume(scheduler.GetMainCoroutine());
     return read(fd, str, len);
@@ -52,7 +52,7 @@ inline int coWrite(int fd, char* str, unsigned int len)
     event.next = nullptr;
     event.co = scheduler.GetCurrentCoroutine();
     event.fd = fd;
-    event.event = (EPOLLOUT|EPOLLERR);
+    event.event.events = (EPOLLOUT|EPOLLERR);
     scheduler.AddIoEvent(&event);
     scheduler.Resume(scheduler.GetMainCoroutine());
     return write(fd, str, len);

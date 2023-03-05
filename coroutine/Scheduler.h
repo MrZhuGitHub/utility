@@ -10,8 +10,6 @@
 
 namespace Common
 {
-extern Scheduler scheduler;
-
 class Coroutine;
 
 struct TimeEvent
@@ -19,7 +17,7 @@ struct TimeEvent
     Coroutine* co;
     uint64_t timeout;
     TimeEvent* next;
-}
+};
 
 struct IoEvent
 {
@@ -27,7 +25,7 @@ struct IoEvent
     int fd;
     struct epoll_event event;
     IoEvent* next;
-}
+};
 
 class Scheduler
 {
@@ -38,9 +36,9 @@ public:
 
     ~Scheduler();
 
-    bool AddTimeEvent(const TimeEvent* const event);
+    bool AddTimeEvent(TimeEvent* event);
 
-    bool AddIoEvent(const IoEvent* const event);
+    bool AddIoEvent(IoEvent* event);
 
     Coroutine* GetCurrentCoroutine()
     {
@@ -51,6 +49,8 @@ public:
     {
         return mainCoroutine_;
     }
+
+    void Resume(Coroutine* co);
 
     friend class Coroutine;
 
@@ -79,8 +79,6 @@ private:
         }
         return head;
     }
-
-    void Resume(Coroutine* co);
 
     void RemoveCoroutine(Coroutine* co);
 

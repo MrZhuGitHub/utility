@@ -8,7 +8,7 @@ namespace Common
 Scheduler scheduler;
 
 Scheduler::Scheduler()
-    : mainCoroutine_(new Coroutine(nullptr)),
+    : mainCoroutine_(new Coroutine()),
       coroutines_(mainCoroutine_),
       currentCoroutine_(mainCoroutine_),
       timeEvent_(nullptr),
@@ -42,7 +42,7 @@ void Scheduler::RemoveCoroutine(Coroutine* co)
     coroutines_ = RemoveItem<Coroutine>(coroutines_, co);
 }
 
-bool Scheduler::AddTimeEvent(const TimeEvent* const event)
+bool Scheduler::AddTimeEvent(TimeEvent* event)
 {
     if (nullptr == timeEvent_)
     {
@@ -57,7 +57,7 @@ bool Scheduler::AddTimeEvent(const TimeEvent* const event)
     return true;
 }
 
-bool Scheduler::AddIoEvent(const IoEvent* const event)
+bool Scheduler::AddIoEvent(IoEvent* event)
 {
     if (nullptr == ioEvent_)
     {
@@ -69,7 +69,7 @@ bool Scheduler::AddIoEvent(const IoEvent* const event)
         }
         ioEvent_->next = event;
     }
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, event->fd, event->event);
+    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, event->fd, &event->event);
     if (0 != ret) {
         return false;
     }
@@ -81,7 +81,7 @@ void Scheduler::Eventloop()
     while(1) {
         int eventCount = epoll_wait(epfd_, events_, MAX_EVENTS, WAIT_DURATION);
         TimeEvent* timeEvents = timeEvent_;
-        for (nullptr != timeEvents)
+        while (nullptr != timeEvents)
         {
             timeval val;
             gettimeofday(&val, nullptr);
@@ -103,6 +103,7 @@ void Scheduler::Eventloop()
                 {
                     Resume(ioEvents->co);
                     ioEvent_ = RemoveItem<IoEvent>(ioEvent_, ioEvents);
+                    epoll_ctl(epfd_, EPOLL_CTL_DEL, ioEvents->fd, &ioEvents->event);
                     break;
                 }
             }
@@ -112,7 +113,7 @@ void Scheduler::Eventloop()
 
 void Scheduler::SwapContext(Coroutine* current, Coroutine* next)
 {
-#ifdef defined(__x86_64__)
+#ifdef __x86_64__
     __asm__ __volatile__ (
         "movq %rax,(%rsi)\n"
         "movq %rbx,8(%rsi)\n"
