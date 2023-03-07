@@ -3,13 +3,14 @@
 #include <cstdlib>
 #include <thread>
 #include <iostream>
+#include <string.h>
 
 namespace Common {
 
-// void Coroutine::StartCo(std::function<void()>* fn)
-// {
-//     (*fn)();
-// }
+void Coroutine::StartCo(std::function<void()>* fn)
+{
+    (*fn)();
+}
 
 void Coroutine::EventLoop()
 {
@@ -20,8 +21,11 @@ void Coroutine::Start()
 {
     started_ = true;
     stack_ = (char*)malloc(stackSize_);
+    memset(stack_, 0, stackSize_);
     char* stack = stack_;
-    stack = stack + STACK_BASE_OFFSET;
+    stack = stack + STACK - 100;
+    //@note : Stack memory needs to be aligned, otherwise would result to Segmentation fault.
+    stack = (char*)(((uint64_t)(stack) & 0xffffffffff00) + 8);
     void** eip = (void**)(stack - EIP_REGISTER_OFFSET);
     (*eip) = (void*)(Common::Coroutine::StartCo);
     regs_[RBP] = (char*)(stack - EBP_REGISTER_OFFSET);

@@ -6,7 +6,7 @@
 
 #define STACK (1024*1024)
 #define MAX_STACK (10*STACK)
-#define STACK_BASE_OFFSET (STACK - 100)
+// #define STACK_BASE_OFFSET (STACK - 120)
 #define EIP_REGISTER_OFFSET 24
 #define EBP_REGISTER_OFFSET 32
 
@@ -70,11 +70,8 @@ public:
 
     friend class Scheduler;
 
-// private:
-    static void StartCo(std::function<void()>* fn)
-    {
-        (*fn)();
-    }
+private:
+    static void StartCo(std::function<void()>* fn);
 
 private:
     char* regs_[16];
