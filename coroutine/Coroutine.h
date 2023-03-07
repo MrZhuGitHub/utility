@@ -6,7 +6,7 @@
 
 #define STACK (1024*1024)
 #define MAX_STACK (10*STACK)
-#define STACK_BASE_OFFSET 1000
+#define STACK_BASE_OFFSET (STACK - 100)
 #define EIP_REGISTER_OFFSET 24
 #define EBP_REGISTER_OFFSET 32
 
@@ -33,6 +33,23 @@ class Scheduler;
 
 class Coroutine {
 public:
+    template <typename F, typename... Args>
+    Coroutine(F Func, Args... args)
+    :   stack_(nullptr),
+        next(nullptr),
+        stackSize_(STACK),
+        started_(false),
+        scheduler_(&scheduler)
+    {   
+        function_ = [=]()->void
+        {
+            std::function<decltype(Func(args...))()> f = std::bind(Func, args...);
+            f();
+            auto mainCo = scheduler_->GetMainCoroutine();
+            scheduler_->Resume(mainCo);
+        };
+    }
+
     Coroutine()
     :   stack_(nullptr),
         next(nullptr),
@@ -43,25 +60,7 @@ public:
 
     }
 
-    template <typename F, typename... Args>
-    Coroutine(F Func, Args... args)
-        : stack_(nullptr),
-          next(nullptr),
-          stackSize_(STACK),
-          started_(false),
-          scheduler_(&scheduler)
-    {   
-        std::function<void()> func = [&]()->void
-        {
-            std::function<decltype(Func(args...))()> f = std::bind(Func, args...);
-            f();
-            auto mainCo = scheduler_->GetMainCoroutine();
-            scheduler_->Resume(mainCo);
-        };
-        void (*fn)();
-        fn = func.target<void()>();
-        func_ = reinterpret_cast<void*>(fn);
-    }
+    static void EventLoop();
 
     void Start();
 
@@ -71,15 +70,20 @@ public:
 
     friend class Scheduler;
 
+// private:
+    static void StartCo(std::function<void()>* fn)
+    {
+        (*fn)();
+    }
+
 private:
     char* regs_[16];
     char* stack_;
-    void* func_;
-    Scheduler* scheduler_;
-    std::function<void(void)> function_;
+    std::function<void()> function_;
     Coroutine* next;
     uint32_t stackSize_;
     bool started_;
+    Scheduler* scheduler_;
 };
 
 }

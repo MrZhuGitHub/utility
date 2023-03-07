@@ -1,6 +1,7 @@
 #include "Scheduler.h"
 #include "Coroutine.h"
 #include <sys/time.h>
+#include <iostream>
 
 namespace Common
 {
@@ -22,16 +23,22 @@ void Scheduler::Resume(Coroutine* co)
     Coroutine* next = co;
     Coroutine* current = currentCoroutine_;
     Coroutine* ptr = coroutines_;
+    if (ptr == nullptr) {
+        coroutines_ = co;
+    }
+    Coroutine* pre = nullptr;
     while (ptr != nullptr)
     {
         if (ptr == co) {
             break;
         } else {
+            pre = ptr;
             ptr = ptr->next;
         }
     }
     if (ptr == nullptr) {
-        coroutines_ = co;
+        pre->next = co;
+        co->next = nullptr;
     }
     currentCoroutine_ = co;
     SwapContext(current, next);
@@ -86,12 +93,18 @@ void Scheduler::Eventloop()
             timeval val;
             gettimeofday(&val, nullptr);
             uint64_t timeout = val.tv_sec*1000 + val.tv_usec/1000;
+            TimeEvent* removeTtem = nullptr;
             if (timeout >= timeEvents->timeout)
             {
                 Resume(timeEvents->co);
                 timeEvent_ = RemoveItem<TimeEvent>(timeEvent_, timeEvents);
-            } 
+                removeTtem = timeEvents;
+            }
             timeEvents = timeEvents->next;
+            if (nullptr != removeTtem)
+            {
+                delete removeTtem;
+            }
         }
         for (int i = 0; i < eventCount; i++)
         {
@@ -104,8 +117,13 @@ void Scheduler::Eventloop()
                     Resume(ioEvents->co);
                     ioEvent_ = RemoveItem<IoEvent>(ioEvent_, ioEvents);
                     epoll_ctl(epfd_, EPOLL_CTL_DEL, ioEvents->fd, &ioEvents->event);
+                    if (nullptr != ioEvents)
+                    {
+                        delete ioEvents;
+                    }
                     break;
                 }
+                ioEvents = ioEvents->next;
             }
         }
     }

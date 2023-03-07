@@ -27,8 +27,7 @@ link_directories(${PROJECT_SOURCE_DIR}/lib/${OUTPUT_PATH}/)
 add_subdirectory(${PROJECT_SOURCE_DIR}/coroutine/)
 add_subdirectory(${PROJECT_SOURCE_DIR}/sample/)
 
-option(GTEST "Controling whether to build test" OFF)
-
-if(GTEST)
-    add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
+if(${TEST} STREQUAL "YES")
+    # add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
+    message("build test!")
 endif()

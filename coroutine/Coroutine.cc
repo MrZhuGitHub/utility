@@ -2,20 +2,33 @@
 #include "Scheduler.h"
 #include <cstdlib>
 #include <thread>
+#include <iostream>
 
 namespace Common {
+
+// void Coroutine::StartCo(std::function<void()>* fn)
+// {
+//     (*fn)();
+// }
+
+void Coroutine::EventLoop()
+{
+    scheduler.Eventloop();
+}
 
 void Coroutine::Start()
 {
     started_ = true;
     stack_ = (char*)malloc(stackSize_);
-    stack_ = stack_ + STACK_BASE_OFFSET;
-    void** eip = (void**)(stack_ - EIP_REGISTER_OFFSET);
-    (*eip) = func_;
-    regs_[RBP] = (char*)(stack_ - EBP_REGISTER_OFFSET);
-    regs_[RSP] = (char*)(stack_ - EBP_REGISTER_OFFSET);
-    char** ebp = (char**)(stack_ - EBP_REGISTER_OFFSET);
-    (*ebp) = stack_;
+    char* stack = stack_;
+    stack = stack + STACK_BASE_OFFSET;
+    void** eip = (void**)(stack - EIP_REGISTER_OFFSET);
+    (*eip) = (void*)(Common::Coroutine::StartCo);
+    regs_[RBP] = (char*)(stack - EBP_REGISTER_OFFSET);
+    regs_[RSP] = (char*)(stack - EBP_REGISTER_OFFSET);
+    regs_[RDI] = (char*)(&function_);
+    char** ebp = (char**)(stack - EBP_REGISTER_OFFSET);
+    (*ebp) = stack;
     scheduler_->Resume(this);
 }
 

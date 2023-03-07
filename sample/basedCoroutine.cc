@@ -9,6 +9,7 @@ void Func1(std::string str, int num)
 {
     std::cout << str << num << std::endl;
     Common::coSleep(10000);
+    std::cout << "111" << std::endl;
 }
 
 void Func2()
@@ -22,5 +23,5 @@ int main()
     continue1.Start();
     Common::Coroutine continue2(Func2);
     continue2.Start();
-    Common::scheduler.Eventloop();
+    Common::Coroutine::EventLoop();
 };

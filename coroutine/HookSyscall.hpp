@@ -10,13 +10,13 @@ namespace Common
 {
 inline void coSleep(unsigned int milliseconds)
 {
-    TimeEvent event;
-    event.next = nullptr;
-    event.co = scheduler.GetCurrentCoroutine();
+    TimeEvent* event = new TimeEvent();
+    event->next = nullptr;
+    event->co = scheduler.GetCurrentCoroutine();
     timeval val;
     gettimeofday(&val, nullptr);
-    event.timeout = val.tv_sec*1000 + val.tv_usec/1000;
-    scheduler.AddTimeEvent(&event);
+    event->timeout = val.tv_sec*1000 + val.tv_usec/1000 + milliseconds;
+    scheduler.AddTimeEvent(event);
     scheduler.Resume(scheduler.GetMainCoroutine());
 }
 
@@ -29,12 +29,12 @@ inline int coRead(int fd, char* str, unsigned int len)
     if (0 != ret) {
         return ret;
     }
-    IoEvent event;
-    event.next = nullptr;
-    event.co = scheduler.GetCurrentCoroutine();
-    event.fd = fd;
-    event.event.events = (EPOLLIN|EPOLLERR);
-    scheduler.AddIoEvent(&event);
+    IoEvent* event = new IoEvent();
+    event->next = nullptr;
+    event->co = scheduler.GetCurrentCoroutine();
+    event->fd = fd;
+    event->event.events = (EPOLLIN|EPOLLERR);
+    scheduler.AddIoEvent(event);
     scheduler.Resume(scheduler.GetMainCoroutine());
     return read(fd, str, len);
 }
@@ -48,12 +48,12 @@ inline int coWrite(int fd, char* str, unsigned int len)
     if (0 != ret) {
         return ret;
     }
-    IoEvent event;
-    event.next = nullptr;
-    event.co = scheduler.GetCurrentCoroutine();
-    event.fd = fd;
-    event.event.events = (EPOLLOUT|EPOLLERR);
-    scheduler.AddIoEvent(&event);
+    IoEvent* event = new IoEvent();
+    event->next = nullptr;
+    event->co = scheduler.GetCurrentCoroutine();
+    event->fd = fd;
+    event->event.events = (EPOLLOUT|EPOLLERR);
+    scheduler.AddIoEvent(event);
     scheduler.Resume(scheduler.GetMainCoroutine());
     return write(fd, str, len);
 }
