@@ -27,7 +27,7 @@
 #define R14 14  //被调用者保存
 #define R15 15  //被调用者保存
 
-namespace Common {
+namespace Utility {
 
 class Scheduler;
 
@@ -41,7 +41,7 @@ public:
         started_(false),
         scheduler_(&scheduler)
     {   
-        function_ = [=]()->void
+        function_ = [=,this]()->void
         {
             std::function<decltype(Func(args...))()> f = std::bind(Func, args...);
             f();

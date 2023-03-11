@@ -1,7 +1,7 @@
 #ifndef _RING_BUFFER_
 #define _RING_BUFFER_
 
-namespace Common {
+namespace Utility {
 
 template<typename T>
 class Channel

@@ -8,7 +8,7 @@
 #define MAX_EVENTS 1024
 #define WAIT_DURATION 1
 
-namespace Common
+namespace Utility
 {
 class Coroutine;
 

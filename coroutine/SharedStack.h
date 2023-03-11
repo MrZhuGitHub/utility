@@ -1,7 +1,7 @@
 #ifndef _SHARED_STACK_H_
 #define _SHARED_STACK_H_
 
-namespace Common
+namespace Utility
 {
 class SharedStack
 {

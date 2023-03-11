@@ -3,7 +3,7 @@
 #include <sys/time.h>
 #include <iostream>
 
-namespace Common
+namespace Utility
 {
 
 Scheduler scheduler;

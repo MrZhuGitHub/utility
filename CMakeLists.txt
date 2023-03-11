@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(Common)
+project(Utility)
 
-set(CO_LIB "mycoroutine")
-set(SAMPLE "sample")
+set(COROUTINE "mycoroutine")
+set(SAMPLES "sample")
+set(TESTS "utilityTest")
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "debug")
     set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -std=c++2a -o0 -lpthread")
     set(OUTPUT_PATH "Debug")
 else()
@@ -14,7 +15,7 @@ else()
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/coroutine/)
-include_directories(${PROJECT_SOURCE_DIR}/c++20/)
+include_directories(${PROJECT_SOURCE_DIR}/cppNewFeature/)
 include_directories(${PROJECT_SOURCE_DIR}/lockfree/)
 include_directories(${PROJECT_SOURCE_DIR}/threadpool/)
 
@@ -25,9 +26,11 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib/${OUTPUT_PATH}/)
 link_directories(${PROJECT_SOURCE_DIR}/lib/${OUTPUT_PATH}/)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/coroutine/)
-add_subdirectory(${PROJECT_SOURCE_DIR}/sample/)
 
-if(${TEST} STREQUAL "YES")
-    # add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
-    message("build test!")
+if(${SAMPLE} STREQUAL "yes")
+    add_subdirectory(${PROJECT_SOURCE_DIR}/sample/)
+endif()
+
+if(${TEST} STREQUAL "yes")
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test/)
 endif()

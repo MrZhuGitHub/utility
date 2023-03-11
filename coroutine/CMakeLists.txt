@@ -1,9 +1,9 @@
-project(${CO_LIB})
+project(${COROUTINE})
 
 aux_source_directory(. SRC_DIR)
 
-add_library(${CO_LIB} SHARED ${SRC_DIR})
+add_library(${COROUTINE} SHARED ${SRC_DIR})
 
-install(TARGETS ${CO_LIB}
+install(TARGETS ${COROUTINE}
     LIBRARY DESTINATION /usr/lib/
 )

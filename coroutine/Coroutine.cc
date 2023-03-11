@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string.h>
 
-namespace Common {
+namespace Utility {
 
 void Coroutine::StartCo(std::function<void()>* fn)
 {
@@ -24,10 +24,10 @@ void Coroutine::Start()
     memset(stack_, 0, stackSize_);
     char* stack = stack_;
     stack = stack + STACK - 100;
-    //@note : Stack memory needs to be aligned, otherwise would result to Segmentation fault.
+    //@note : Stack memory needs to be aligned, otherwise would result to segmentation fault, which depends on cpu.
     stack = (char*)(((uint64_t)(stack) & 0xffffffffff00) + 8);
     void** eip = (void**)(stack - EIP_REGISTER_OFFSET);
-    (*eip) = (void*)(Common::Coroutine::StartCo);
+    (*eip) = (void*)(Utility::Coroutine::StartCo);
     regs_[RBP] = (char*)(stack - EBP_REGISTER_OFFSET);
     regs_[RSP] = (char*)(stack - EBP_REGISTER_OFFSET);
     regs_[RDI] = (char*)(&function_);
