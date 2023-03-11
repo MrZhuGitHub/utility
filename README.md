@@ -5,9 +5,13 @@ Implement some Utility utility, including stackfull coroutine, threadpool, ringb
 # build
 
 Usage : ./build.sh -build [build_option] -test [test_option] -sample [sample_option]
+
 build_option = clean debug release
+
 test_option = yes no
+
 sample_option = yes no
+
 example : ./build.sh -build debug -test yes -sample yes
 
 
