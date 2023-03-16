@@ -25,6 +25,7 @@ struct IoEvent
     int fd;
     struct epoll_event event;
     IoEvent* next;
+    uint32_t ret;
 };
 
 class Scheduler

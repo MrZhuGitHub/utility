@@ -96,8 +96,8 @@ void Scheduler::Eventloop()
             TimeEvent* removeTtem = nullptr;
             if (timeout >= timeEvents->timeout)
             {
-                Resume(timeEvents->co);
                 timeEvent_ = RemoveItem<TimeEvent>(timeEvent_, timeEvents);
+                Resume(timeEvents->co);
                 removeTtem = timeEvents;
             }
             timeEvents = timeEvents->next;
@@ -114,8 +114,9 @@ void Scheduler::Eventloop()
             {
                 if (ioEvents->fd == fd)
                 {
-                    Resume(ioEvents->co);
+                    ioEvents->ret = events_[i].events;
                     ioEvent_ = RemoveItem<IoEvent>(ioEvent_, ioEvents);
+                    Resume(ioEvents->co);
                     epoll_ctl(epfd_, EPOLL_CTL_DEL, ioEvents->fd, &ioEvents->event);
                     if (nullptr != ioEvents)
                     {

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <socket.h>
 
 namespace Utility
 {
@@ -57,6 +58,60 @@ inline int coWrite(int fd, char* str, unsigned int len)
     scheduler.Resume(scheduler.GetMainCoroutine());
     return write(fd, str, len);
 }
+
+inline int coAccept(int sockfd, sockaddr *addr, socklen_t *addrlen)
+{
+    int flags = fcntl(sockfd, F_GETFL);
+    flags = (flags|O_NONBLOCK);
+    fcntl(fd, F_SETFL, flags);
+    IoEvent* event = new IoEvent();
+    event->next = nullptr;
+    event->fd = fd;
+    event->co = scheduler.GetCurrentCoroutine();
+    event->event = EPOLLIN;
+    scheduler.AddIoEvent(event);
+    scheduler.Resume(scheduler.GetMainCoroutine());
+    return accept(sockfd, addr, addrlen);
+}
+
+inline int coConnect(int fd, sockaddr* addr, socklen_t len)
+{
+    int flags = fcntl(fd, F_GETFL);
+    flags = (flags|O_NONBLOCK);
+    fcntl(fd, F_SETFL, flags);
+    while (1)
+    {
+        int ret = connect(fd, addr, len);
+        if (0 == ret)
+        {
+            return ret;
+        }
+        if (-1 == ret)
+        {
+            if (EINTR == ret)
+            {
+                continue;
+            } else if (EINPROGRESS != errno) {
+                return ret;
+            } else {
+                IoEvent* event = new IoEvent();
+                event->next = nullptr;
+                event->fd = fd;
+                event->co = scheduler.GetCurrentCoroutine();
+                event->event = EPOLLIN;
+                scheduler.AddIoEvent(event);
+                scheduler.Resume(scheduler.GetMainCoroutine());
+                if (event->ret & EPOLLERR)
+                {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            }
+        }
+    }
+}
+
 }
 
 #endif
