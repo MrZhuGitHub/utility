@@ -5,80 +5,73 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <fcntl.h>
-#include <socket.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <iostream>
+#include <memory>
 
 namespace Utility
 {
 inline void coSleep(unsigned int milliseconds)
 {
-    TimeEvent* event = new TimeEvent();
-    event->next = nullptr;
-    event->co = scheduler.GetCurrentCoroutine();
+    auto event = std::make_shared<TimeEvent>();
+    auto scheduler = Scheduler::GetCurrentScheduler();
+    event->suspendCoroutine = scheduler->GetCurrentCoroutine();
     timeval val;
     gettimeofday(&val, nullptr);
     event->timeout = val.tv_sec*1000 + val.tv_usec/1000 + milliseconds;
-    scheduler.AddTimeEvent(event);
-    scheduler.Resume(scheduler.GetMainCoroutine());
+    scheduler->SwitchCoroutine(event);
+}
+
+inline int setNoBlockingIO(int fd)
+{
+    int flags = fcntl(fd, F_GETFL);
+    flags = (flags|O_NONBLOCK);
+    return fcntl(fd, F_SETFL, flags);    
 }
 
 inline int coRead(int fd, char* str, unsigned int len)
 {
-    int flags = fcntl(fd, F_GETFL);
-    flags = (flags|O_NONBLOCK);
-    fcntl(fd, F_SETFL, flags);
-    int ret = read(fd, str, len);
-    if (0 != ret) {
-        return ret;
-    }
-    IoEvent* event = new IoEvent();
-    event->next = nullptr;
-    event->co = scheduler.GetCurrentCoroutine();
+    setNoBlockingIO(fd);
+    auto event = std::make_shared<IoEvent>();
+    auto scheduler = Scheduler::GetCurrentScheduler();
+    event->suspendCoroutine = scheduler->GetCurrentCoroutine();
     event->fd = fd;
     event->event.events = (EPOLLIN|EPOLLERR);
-    scheduler.AddIoEvent(event);
-    scheduler.Resume(scheduler.GetMainCoroutine());
+    event->event.data.fd = fd;
+    scheduler->SwitchCoroutine(event);
     return read(fd, str, len);
 }
 
-inline int coWrite(int fd, char* str, unsigned int len)
+inline int coWrite(int fd, const char* str, unsigned int len)
 {
-    int flags = fcntl(fd, F_GETFL);
-    flags = (flags|O_NONBLOCK);
-    fcntl(fd, F_SETFL, flags);
-    int ret = write(fd, str, len);
-    if (0 != ret) {
-        return ret;
-    }
-    IoEvent* event = new IoEvent();
-    event->next = nullptr;
-    event->co = scheduler.GetCurrentCoroutine();
+    setNoBlockingIO(fd);
+    auto event = std::make_shared<IoEvent>();
+    auto scheduler = Scheduler::GetCurrentScheduler();
+    event->suspendCoroutine = scheduler->GetCurrentCoroutine();
     event->fd = fd;
     event->event.events = (EPOLLOUT|EPOLLERR);
-    scheduler.AddIoEvent(event);
-    scheduler.Resume(scheduler.GetMainCoroutine());
+    event->event.data.fd = fd;
+    scheduler->SwitchCoroutine(event);
     return write(fd, str, len);
 }
 
-inline int coAccept(int sockfd, sockaddr *addr, socklen_t *addrlen)
+inline int coAccept(int fd, sockaddr *addr, socklen_t *addrlen)
 {
-    int flags = fcntl(sockfd, F_GETFL);
-    flags = (flags|O_NONBLOCK);
-    fcntl(fd, F_SETFL, flags);
-    IoEvent* event = new IoEvent();
-    event->next = nullptr;
+    setNoBlockingIO(fd);
+    auto event = std::make_shared<IoEvent>();
+    auto scheduler = Scheduler::GetCurrentScheduler();
+    event->suspendCoroutine = scheduler->GetCurrentCoroutine();
     event->fd = fd;
-    event->co = scheduler.GetCurrentCoroutine();
-    event->event = EPOLLIN;
-    scheduler.AddIoEvent(event);
-    scheduler.Resume(scheduler.GetMainCoroutine());
-    return accept(sockfd, addr, addrlen);
+    event->event.events = EPOLLIN;
+    event->event.data.fd = fd;
+    scheduler->SwitchCoroutine(event);
+    return accept(fd, addr, addrlen);
 }
 
 inline int coConnect(int fd, sockaddr* addr, socklen_t len)
 {
-    int flags = fcntl(fd, F_GETFL);
-    flags = (flags|O_NONBLOCK);
-    fcntl(fd, F_SETFL, flags);
+    setNoBlockingIO(fd);
     while (1)
     {
         int ret = connect(fd, addr, len);
@@ -88,24 +81,29 @@ inline int coConnect(int fd, sockaddr* addr, socklen_t len)
         }
         if (-1 == ret)
         {
-            if (EINTR == ret)
+            if (EINTR == errno)
             {
                 continue;
-            } else if (EINPROGRESS != errno) {
+            }
+            if (EINPROGRESS != errno) {
                 return ret;
             } else {
-                IoEvent* event = new IoEvent();
-                event->next = nullptr;
+                auto event = std::make_shared<IoEvent>();
+                auto scheduler = Scheduler::GetCurrentScheduler();
+                event->suspendCoroutine = scheduler->GetCurrentCoroutine();
                 event->fd = fd;
-                event->co = scheduler.GetCurrentCoroutine();
-                event->event = EPOLLIN;
-                scheduler.AddIoEvent(event);
-                scheduler.Resume(scheduler.GetMainCoroutine());
-                if (event->ret & EPOLLERR)
+                event->event.events = (EPOLLIN|EPOLLOUT);
+                event->event.data.fd = fd;
+                scheduler->SwitchCoroutine(event);
+
+                int32_t temperr = 0;
+                socklen_t temperrlen = sizeof(temperr);
+                int ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, (void*)&temperr, &temperrlen);
+                if(ret >= 0)
                 {
-                    return -1;
-                } else {
                     return 0;
+                } else {
+                    return -1;
                 }
             }
         }

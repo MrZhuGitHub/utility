@@ -10,16 +10,17 @@
 #include <vector>
 #include <memory>
 
-#define MAX_MSG_LEN 1000;
+#define MAX_MSG_LEN 1000
 
 void acceptClient(int clientSocket)
 {
+    std::cout << "6" << std::endl;
     char msg[MAX_MSG_LEN];
     memset(msg, 0, MAX_MSG_LEN);
     while (true)
     {
         int readLen = Utility::coRead(clientSocket, msg, MAX_MSG_LEN);
-        if (readLen < 0)
+        if (readLen <= 0)
         {
             std::cout << "client close, fd = " << clientSocket << std::endl;
             close(clientSocket);
@@ -29,8 +30,8 @@ void acceptClient(int clientSocket)
         int begin = 0;
         while (readLen > 0)
         {
-            int writeLen = Utility::coWrite(clientSocket, msg[begin], readLen);
-            if (writeLen < 0)
+            int writeLen = Utility::coWrite(clientSocket, (msg + begin), readLen);
+            if (writeLen <= 0)
             {
                 std::cout << "client close, fd = " << clientSocket << std::endl;
                 close(clientSocket);
@@ -84,17 +85,20 @@ void listenPort(uint32_t port)
         if (-1 == clientSocket)
         {
             std::cout << "accpet fd failed" << std::endl;
+        } else {
+            std::cout << "established new tcp connection, fd = " << clientSocket << std::endl;
+            std::shared_ptr<Utility::Coroutine> ptrAcceptClient = std::make_shared<Utility::Coroutine>(acceptClient, clientSocket);
+            coroutines.push_back(ptrAcceptClient);
+            ptrAcceptClient->Start();
         }
-        std::shared_ptr<Utility::Coroutine> ptrAcceptClient = std::make_shared<Utility::Coroutine>(acceptClient, clientSocket);
-        coroutines.push_back(ptrAcceptClient);
-        ptrAcceptClient->Start();
     }
 }
 
 int main()
 {
-    Utility::Coroutine coListenPort(listenPort, 8000);
-    coListenPort.Start();
-    Utility::Coroutine::EventLoop();
+    auto scheduler = Utility::Scheduler::GetCurrentScheduler();
+    auto server = std::make_shared<Utility::Coroutine>(listenPort, 8000);
+    server->Start();
+    scheduler->Eventloop();
     return 0;
 }
