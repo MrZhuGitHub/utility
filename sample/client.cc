@@ -9,6 +9,7 @@
 #include "HookSyscall.hpp"
 #include <vector>
 #include <memory>
+#include <signal.h>
 
 #define MAX_MSG_LEN 1000
 
@@ -70,6 +71,11 @@ void client(std::string ip, int port)
     }
 }
 
+void signalHandle(int sig)
+{
+
+}
+
 int main(int argc, char* argv[])
 {
     if (argc < 4)
@@ -80,6 +86,7 @@ int main(int argc, char* argv[])
     int clientNum = atoi(argv[1]);
     std::string ip = argv[2];
     int port = atoi(argv[3]);
+    signal(SIGPIPE, signalHandle);
     auto scheduler = Utility::Scheduler::GetCurrentScheduler();
     std::vector<std::shared_ptr<Utility::Coroutine>> coroutines;
     for (int i = 0; i < clientNum; i++)
