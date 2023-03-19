@@ -3,6 +3,11 @@
 
 #include <map>
 #include <sys/epoll.h>
+#include <vector>
+#include <iostream>
+#include <unordered_map>
+#include <thread>
+#include <memory>
 
 #define FD_SIZE 1024
 #define MAX_EVENTS 1024
@@ -12,19 +17,24 @@ namespace Utility
 {
 class Coroutine;
 
+struct SwitchEvent
+{
+    std::shared_ptr<Coroutine> suspendCoroutine;
+    std::shared_ptr<Coroutine> resumeCoroutine;
+};
+
 struct TimeEvent
 {
-    Coroutine* co;
+    std::shared_ptr<Coroutine> suspendCoroutine;
     uint64_t timeout;
-    TimeEvent* next;
 };
 
 struct IoEvent
 {
-    Coroutine* co;
+    std::shared_ptr<Coroutine> suspendCoroutine;
     int fd;
     struct epoll_event event;
-    IoEvent* next;
+    uint32_t ret;
 };
 
 class Scheduler
@@ -36,65 +46,81 @@ public:
 
     ~Scheduler();
 
-    bool AddTimeEvent(TimeEvent* event);
+    void SwitchCoroutine(std::shared_ptr<TimeEvent> event)
+    {
+        if (!event)
+        {
+            std::cout << "Error: time event is nullptr" << std::endl;
+            return;
+        }
+        addTimeEvents_.push_back(event);
+        this->SwitchCoroutine(mainCoroutine_);
+    }
 
-    bool AddIoEvent(IoEvent* event);
+    void SwitchCoroutine(std::shared_ptr<IoEvent> event)
+    {
+        if (!event)
+        {
+            std::cout << "Error: io event is nullptr" << std::endl;
+            return;
+        }
+        addIoEvents_.insert(std::pair<int, std::shared_ptr<IoEvent>>(event->fd, event));
+        this->SwitchCoroutine(mainCoroutine_);
+    }
 
-    Coroutine* GetCurrentCoroutine()
+    void SwitchCoroutine(std::shared_ptr<SwitchEvent> event)
+    {
+        if (!event)
+        {
+            std::cout << "Error: switch event is nullptr" << std::endl;
+            return;
+        }
+        if (event->suspendCoroutine != mainCoroutine_ && event->resumeCoroutine != mainCoroutine_)
+        {
+            // std::cout << "Info : from coroutine = " << event->suspendCoroutine->getCoroutineId();
+            // std::cout << "start coroutine = " << event->resumeCoroutine->getCoroutineId() << std::endl;
+            addSwitchCoroutines_.push_back(event);
+        } else if (event->resumeCoroutine == mainCoroutine_) {
+            // std::cout << "Info : end coroutine = " << event->suspendCoroutine->getCoroutineId() << std::endl;
+        } else {
+            // std::cout << "Info : from coroutine = " << event->suspendCoroutine->getCoroutineId();
+            // std::cout << "start coroutine = " << event->resumeCoroutine->getCoroutineId() << std::endl;
+        }
+        this->SwitchCoroutine(event->resumeCoroutine);
+    }
+
+    static std::shared_ptr<Scheduler> GetCurrentScheduler();
+
+    std::shared_ptr<Coroutine> GetCurrentCoroutine()
     {
         return currentCoroutine_;
     }
 
-    Coroutine* GetMainCoroutine()
+    std::shared_ptr<Coroutine> GetMainCoroutine()
     {
         return mainCoroutine_;
     }
 
-    void Resume(Coroutine* co);
+private:
+    void SwitchCoroutine(std::shared_ptr<Coroutine> co);
 
-    friend class Coroutine;
+    void SwapContext(char* currentStackInfo, char* nextStackInfo);
 
 private:
-    template<typename T>
-    T* RemoveItem(T* head, T* item)
-    {
-        if (nullptr == head || nullptr == item)
-        {
-            return nullptr;
-        }
-        if (head == item) {
-            head = item->next;
-            return head;
-        }
-        T* preItem = head;
-        T* nextItem = head->next;
-        while (nextItem != item && nextItem != nullptr)
-        {
-            preItem = preItem->next;
-            nextItem = nextItem->next;
-        }
-        if (nextItem == item)
-        {
-            preItem = nextItem->next;
-        }
-        return head;
-    }
-
-    void RemoveCoroutine(Coroutine* co);
-
-    void SwapContext(Coroutine* current, Coroutine* next);
+    static std::unordered_map<decltype(std::this_thread::get_id()), std::shared_ptr<Scheduler>> kSchedulers;
 
 private:
-    Coroutine* mainCoroutine_;
-    Coroutine* coroutines_;
-    Coroutine* currentCoroutine_;
     int epfd_;
-    TimeEvent* timeEvent_;
-    IoEvent* ioEvent_;
     epoll_event events_[MAX_EVENTS];
+    std::shared_ptr<Coroutine> mainCoroutine_;
+    std::shared_ptr<Coroutine> currentCoroutine_;
+    std::vector<std::shared_ptr<SwitchEvent>> doSwitchCoroutines_;
+    std::vector<std::shared_ptr<TimeEvent>> doTimeEvents_;
+    std::unordered_map<int, std::shared_ptr<IoEvent>> doIoEvents_;
+    std::vector<std::shared_ptr<SwitchEvent>> addSwitchCoroutines_;    
+    std::vector<std::shared_ptr<TimeEvent>> addTimeEvents_;    
+    std::unordered_map<int, std::shared_ptr<IoEvent>> addIoEvents_;
 };
-
-extern Scheduler scheduler;
 
 }
 

@@ -2,6 +2,8 @@
 #define _COROUTINE_H_
 #include <functional>
 #include <cstdint>
+#include <memory>
+#include <atomic>
 #include "Scheduler.h"
 
 #define STACK (1024*1024)
@@ -9,6 +11,7 @@
 // #define STACK_BASE_OFFSET (STACK - 120)
 #define EIP_REGISTER_OFFSET 24
 #define EBP_REGISTER_OFFSET 32
+#define REGISTER_COUNT 16
 
 #define RAX 0   //返回值
 #define RBX 1   //被调用者保存
@@ -29,58 +32,76 @@
 
 namespace Utility {
 
-class Scheduler;
+extern std::atomic<uint64_t> kCoroutineId;
 
-class Coroutine {
+class Coroutine : public std::enable_shared_from_this<Coroutine>
+{
 public:
     template <typename F, typename... Args>
     Coroutine(F Func, Args... args)
     :   stack_(nullptr),
-        next(nullptr),
         stackSize_(STACK),
-        started_(false),
-        scheduler_(&scheduler)
+        started_(false)
     {   
+        uint64_t expect = kCoroutineId.load();
+        uint64_t desire = expect + 1;
+        while (!kCoroutineId.compare_exchange_strong(expect, desire, std::memory_order_acquire))
+        {
+            expect = kCoroutineId.load();
+            desire = expect + 1;
+        }
+        coroutineId = expect + 1;
+
         function_ = [=,this]()->void
         {
             std::function<decltype(Func(args...))()> f = std::bind(Func, args...);
             f();
-            auto mainCo = scheduler_->GetMainCoroutine();
-            scheduler_->Resume(mainCo);
+            auto scheduler = Scheduler::GetCurrentScheduler();
+            auto event = std::make_shared<SwitchEvent>();
+            event->suspendCoroutine = scheduler->GetCurrentCoroutine();
+            event->resumeCoroutine = scheduler->GetMainCoroutine();
+            scheduler->SwitchCoroutine(event);
         };
     }
 
     Coroutine()
     :   stack_(nullptr),
-        next(nullptr),
         stackSize_(STACK),
-        started_(false),
-        scheduler_(&scheduler)
+        started_(false)
     {
-
+        uint64_t expect = kCoroutineId.load();
+        uint64_t desire = expect + 1;
+        while (!kCoroutineId.compare_exchange_strong(expect, desire, std::memory_order_acquire))
+        {
+            expect = kCoroutineId.load();
+            desire = expect + 1;
+        }
+        coroutineId = expect + 1;
     }
-
-    static void EventLoop();
 
     void Start();
 
     bool SetStackSize(uint32_t size);
 
+    uint64_t getCoroutineId()
+    {
+        return coroutineId;
+    }
+
     ~Coroutine();
 
-    friend class Scheduler;
+    friend Scheduler;
 
 private:
     static void StartCo(std::function<void()>* fn);
 
 private:
-    char* regs_[16];
+    char* regs_[REGISTER_COUNT];
     char* stack_;
     std::function<void()> function_;
-    Coroutine* next;
     uint32_t stackSize_;
     bool started_;
-    Scheduler* scheduler_;
+    uint64_t coroutineId;
 };
 
 }

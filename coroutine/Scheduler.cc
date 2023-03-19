@@ -6,130 +6,104 @@
 namespace Utility
 {
 
-Scheduler scheduler;
+std::unordered_map<decltype(std::this_thread::get_id()), std::shared_ptr<Scheduler>> Scheduler::kSchedulers;
+
+std::shared_ptr<Scheduler> Scheduler::GetCurrentScheduler()
+{
+    std::thread::id currentThreadId = std::this_thread::get_id();
+    auto it = kSchedulers.find(currentThreadId);
+    if (it == kSchedulers.end())
+    {
+        std::shared_ptr<Scheduler> ptr =std::make_shared<Scheduler>();
+        kSchedulers.insert(std::pair<std::thread::id, std::shared_ptr<Scheduler>>(currentThreadId, ptr));
+        return ptr;
+    } else {
+        return it->second;
+    }
+}
 
 Scheduler::Scheduler()
-    : mainCoroutine_(new Coroutine()),
-      coroutines_(mainCoroutine_),
-      currentCoroutine_(mainCoroutine_),
-      timeEvent_(nullptr),
-      ioEvent_(nullptr)
+    : mainCoroutine_(std::make_shared<Coroutine>()),
+      currentCoroutine_(mainCoroutine_)
 {
     epfd_ = epoll_create(FD_SIZE);
 }
 
-void Scheduler::Resume(Coroutine* co)
+void Scheduler::SwitchCoroutine(std::shared_ptr<Coroutine> co)
 {
-    Coroutine* next = co;
-    Coroutine* current = currentCoroutine_;
-    Coroutine* ptr = coroutines_;
-    if (ptr == nullptr) {
-        coroutines_ = co;
-    }
-    Coroutine* pre = nullptr;
-    while (ptr != nullptr)
-    {
-        if (ptr == co) {
-            break;
-        } else {
-            pre = ptr;
-            ptr = ptr->next;
-        }
-    }
-    if (ptr == nullptr) {
-        pre->next = co;
-        co->next = nullptr;
-    }
+    char* currentStackInfo = (char*)(&currentCoroutine_->regs_);
+    // std::string output1;
+    // for (uint64_t i = 0; i < currentCoroutine_->getCoroutineId(); i++)
+    // {
+    //     output1.append("    ");
+    // }
+    // std::cout << output1 << currentCoroutine_->getCoroutineId() << std::endl;
+
+    char* nextStackInfo = (char*)(&co->regs_);
+    // std::string output2;
+    // for (uint64_t i = 0; i < co->getCoroutineId(); i++)
+    // {
+    //     output2.append("    ");
+    // }
+    // std::cout << output2 << co->getCoroutineId() << std::endl;
+
     currentCoroutine_ = co;
-    SwapContext(current, next);
-}
-
-void Scheduler::RemoveCoroutine(Coroutine* co)
-{
-    coroutines_ = RemoveItem<Coroutine>(coroutines_, co);
-}
-
-bool Scheduler::AddTimeEvent(TimeEvent* event)
-{
-    if (nullptr == timeEvent_)
-    {
-        timeEvent_ = event;
-    } else {
-        while(nullptr != timeEvent_->next)
-        {
-            timeEvent_ = timeEvent_ ->next;
-        }
-        timeEvent_->next = event;
-    }
-    return true;
-}
-
-bool Scheduler::AddIoEvent(IoEvent* event)
-{
-    if (nullptr == ioEvent_)
-    {
-        ioEvent_ = event;
-    } else {
-        while(nullptr != ioEvent_->next)
-        {
-            ioEvent_ = ioEvent_ ->next;
-        }
-        ioEvent_->next = event;
-    }
-    int ret = epoll_ctl(epfd_, EPOLL_CTL_ADD, event->fd, &event->event);
-    if (0 != ret) {
-        return false;
-    }
-    return true;
+    SwapContext(currentStackInfo, nextStackInfo);
 }
 
 void Scheduler::Eventloop()
 {
-    while(1) {
+    while(true) {
+
+        doIoEvents_.insert(addIoEvents_.begin(), addIoEvents_.end());
+        for (auto& it : addIoEvents_)
+        {
+            epoll_ctl(epfd_, EPOLL_CTL_ADD, it.second->fd, &it.second->event);
+        }
+        addIoEvents_.clear();
+
+        doTimeEvents_.insert(doTimeEvents_.end(), addTimeEvents_.begin(), addTimeEvents_.end());
+        addTimeEvents_.clear();
+
+        doSwitchCoroutines_.insert(doSwitchCoroutines_.begin(), addSwitchCoroutines_.begin(), addSwitchCoroutines_.end());
+        addSwitchCoroutines_.clear();
+
         int eventCount = epoll_wait(epfd_, events_, MAX_EVENTS, WAIT_DURATION);
-        TimeEvent* timeEvents = timeEvent_;
-        while (nullptr != timeEvents)
+        for (auto it = doTimeEvents_.begin(); it != doTimeEvents_.end();)
         {
             timeval val;
             gettimeofday(&val, nullptr);
             uint64_t timeout = val.tv_sec*1000 + val.tv_usec/1000;
-            TimeEvent* removeTtem = nullptr;
-            if (timeout >= timeEvents->timeout)
+            if (timeout >= (*it)->timeout)
             {
-                Resume(timeEvents->co);
-                timeEvent_ = RemoveItem<TimeEvent>(timeEvent_, timeEvents);
-                removeTtem = timeEvents;
-            }
-            timeEvents = timeEvents->next;
-            if (nullptr != removeTtem)
-            {
-                delete removeTtem;
+                this->SwitchCoroutine((*it)->suspendCoroutine);
+                it = doTimeEvents_.erase(it);
+            } else {
+                it++;
             }
         }
+
+        for (auto it = doSwitchCoroutines_.begin(); it != doSwitchCoroutines_.end();)
+        {
+            this->SwitchCoroutine((*it)->suspendCoroutine);
+            it = doSwitchCoroutines_.erase(it);
+        }
+
         for (int i = 0; i < eventCount; i++)
         {
             int fd = events_[i].data.fd;
-            IoEvent* ioEvents = ioEvent_;
-            while(nullptr != ioEvents)
+            std::unordered_map<int, std::shared_ptr<IoEvent>>::iterator it = doIoEvents_.find(fd);
+            if (it != doIoEvents_.end())
             {
-                if (ioEvents->fd == fd)
-                {
-                    Resume(ioEvents->co);
-                    ioEvent_ = RemoveItem<IoEvent>(ioEvent_, ioEvents);
-                    epoll_ctl(epfd_, EPOLL_CTL_DEL, ioEvents->fd, &ioEvents->event);
-                    if (nullptr != ioEvents)
-                    {
-                        delete ioEvents;
-                    }
-                    break;
-                }
-                ioEvents = ioEvents->next;
+                this->SwitchCoroutine(it->second->suspendCoroutine);
+                epoll_ctl(epfd_, EPOLL_CTL_DEL, it->second->fd, &it->second->event);
+                doIoEvents_.erase(it);
             }
         }
     }
 }
 
-void Scheduler::SwapContext(Coroutine* current, Coroutine* next)
+void Scheduler::SwapContext(char* currentStackInfo, char* nextStackInfo)
 {
 #ifdef __x86_64__
     __asm__ __volatile__ (
@@ -173,9 +147,11 @@ void Scheduler::SwapContext(Coroutine* current, Coroutine* next)
 
 Scheduler::~Scheduler()
 {
-    if (nullptr != mainCoroutine_)
+    std::thread::id currentThreadId = std::this_thread::get_id();
+    auto it = kSchedulers.find(currentThreadId);
+    if (it != kSchedulers.end())
     {
-        delete mainCoroutine_;
+        kSchedulers.erase(it);
     }
 }
 }

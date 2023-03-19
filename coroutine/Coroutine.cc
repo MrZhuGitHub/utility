@@ -7,14 +7,11 @@
 
 namespace Utility {
 
+std::atomic<uint64_t> kCoroutineId(0);
+
 void Coroutine::StartCo(std::function<void()>* fn)
 {
     (*fn)();
-}
-
-void Coroutine::EventLoop()
-{
-    scheduler.Eventloop();
 }
 
 void Coroutine::Start()
@@ -33,7 +30,12 @@ void Coroutine::Start()
     regs_[RDI] = (char*)(&function_);
     char** ebp = (char**)(stack - EBP_REGISTER_OFFSET);
     (*ebp) = stack;
-    scheduler_->Resume(this);
+
+    auto scheduler = Scheduler::GetCurrentScheduler();
+    auto event = std::make_shared<SwitchEvent>();
+    event->suspendCoroutine = scheduler->GetCurrentCoroutine();
+    event->resumeCoroutine = shared_from_this();
+    scheduler->SwitchCoroutine(event);
 }
 
 bool Coroutine::SetStackSize(uint32_t size)
@@ -49,7 +51,6 @@ bool Coroutine::SetStackSize(uint32_t size)
 
 Coroutine::~Coroutine()
 {
-    scheduler_->RemoveCoroutine(this);
     if (nullptr != stack_)
     {
         free(stack_);
