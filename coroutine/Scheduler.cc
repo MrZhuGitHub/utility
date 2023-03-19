@@ -32,20 +32,20 @@ Scheduler::Scheduler()
 void Scheduler::SwitchCoroutine(std::shared_ptr<Coroutine> co)
 {
     char* currentStackInfo = (char*)(&currentCoroutine_->regs_);
-    std::string output1;
-    for (uint64_t i = 0; i < currentCoroutine_->getCoroutineId(); i++)
-    {
-        output1.append("    ");
-    }
-    std::cout << output1 << currentCoroutine_->getCoroutineId() << std::endl;
+    // std::string output1;
+    // for (uint64_t i = 0; i < currentCoroutine_->getCoroutineId(); i++)
+    // {
+    //     output1.append("    ");
+    // }
+    // std::cout << output1 << currentCoroutine_->getCoroutineId() << std::endl;
 
     char* nextStackInfo = (char*)(&co->regs_);
-    std::string output2;
-    for (uint64_t i = 0; i < co->getCoroutineId(); i++)
-    {
-        output2.append("    ");
-    }
-    std::cout << output2 << co->getCoroutineId() << std::endl;
+    // std::string output2;
+    // for (uint64_t i = 0; i < co->getCoroutineId(); i++)
+    // {
+    //     output2.append("    ");
+    // }
+    // std::cout << output2 << co->getCoroutineId() << std::endl;
 
     currentCoroutine_ = co;
     SwapContext(currentStackInfo, nextStackInfo);

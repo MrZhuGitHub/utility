@@ -6,7 +6,7 @@
 #include <atomic>
 #include "Scheduler.h"
 
-#define STACK (10*1024*1024)
+#define STACK (1024*1024)
 #define MAX_STACK (10*STACK)
 // #define STACK_BASE_OFFSET (STACK - 120)
 #define EIP_REGISTER_OFFSET 24
@@ -62,7 +62,6 @@ public:
             event->resumeCoroutine = scheduler->GetMainCoroutine();
             scheduler->SwitchCoroutine(event);
         };
-        std::cout << "\tcoroutineId:" << coroutineId << std::endl;
     }
 
     Coroutine()
@@ -78,7 +77,6 @@ public:
             desire = expect + 1;
         }
         coroutineId = expect + 1;
-        std::cout << "\tcoroutineId:" << coroutineId << std::endl;
     }
 
     void Start();
