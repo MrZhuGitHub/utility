@@ -1,5 +1,9 @@
+# ignore file
 *.lib
 *.so
 *.bin
 
-build/
+# ignore directory
+/build
+/bin
+/dir
