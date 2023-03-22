@@ -1,6 +1,6 @@
 # description
 
-Implement some Utility utility, including stackfull coroutine, threadpool, ringbuffer, lock-free queue and so on.
+Implement some utilities, including stackfull coroutine, threadpool, ringbuffer, lock-free queue and so on.
 
 # build
 
